@@ -1,8 +1,8 @@
 {
   "enabled": true,
-  "profile": "selection",
+  "profile": "finalists",
   "repetitions": "3",
-  "fixture": "small-ruby",
+  "fixture": "medium-ruby",
   "reasoning_mode": "auto",
-  "request_id": "broad-selection-final-002"
+  "request_id": "finalists-medium-ruby-001"
 }
