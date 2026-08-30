@@ -1,0 +1,162 @@
+name: Model benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Model set
+        type: choice
+        options: [core, extended]
+        default: core
+      repetitions:
+        description: Repetitions per model
+        type: choice
+        options: ['3', '5', '10']
+        default: '10'
+      fixture:
+        description: Public benchmark fixture
+        type: choice
+        options: [small-ruby]
+        default: small-ruby
+
+permissions:
+  contents: read
+
+concurrency:
+  group: model-benchmark-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.models.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: models
+        env:
+          PROFILE: ${{ inputs.profile }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          models = json.load(open('config/models.json'))['models']
+          profile = os.environ['PROFILE']
+          selected = [m for m in models if profile == 'extended' or m['tier'] == 'core']
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write('matrix=' + json.dumps({'include': selected}, separators=(',', ':')) + '\n')
+          PY
+
+  benchmark:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 9
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    steps:
+      - name: Checkout runner
+        uses: actions/checkout@v5
+
+      - name: Checkout public fixtures
+        uses: actions/checkout@v5
+        with:
+          repository: faheemKamboh/agentic-development-benchmarks
+          path: benchmark-fixtures
+
+      - name: Restore model cache
+        uses: actions/cache@v4
+        with:
+          path: .hf-cache
+          key: hf-${{ runner.os }}-${{ matrix.key }}-${{ matrix.quant }}-v1
+
+      - name: Start model server
+        env:
+          HF_REPO: ${{ matrix.hf_repo }}
+          QUANT: ${{ matrix.quant }}
+        run: |
+          mkdir -p .hf-cache results
+          docker pull ghcr.io/ggml-org/llama.cpp:server
+          docker run -d --name llm-server \
+            --cpus=4 \
+            -p 8080:8080 \
+            -v "$PWD/.hf-cache:/root/.cache/huggingface/hub" \
+            ghcr.io/ggml-org/llama.cpp:server \
+            -hf "${HF_REPO}:${QUANT}" --no-mmproj \
+            --host 0.0.0.0 --port 8080 -t 4 -np 1 -c 4096
+
+      - name: Wait for model
+        run: |
+          for i in $(seq 1 300); do
+            if curl -fsS http://127.0.0.1:8080/health >/dev/null 2>&1; then
+              exit 0
+            fi
+            if ! docker inspect -f '{{.State.Running}}' llm-server 2>/dev/null | grep -q true; then
+              docker logs llm-server
+              exit 1
+            fi
+            sleep 2
+          done
+          docker logs llm-server
+          exit 1
+
+      - name: Start resource sampler
+        run: |
+          (
+            while docker inspect llm-server >/dev/null 2>&1; do
+              printf '{"sampled_at":"%s","stats":' "$(date -u +%FT%TZ)" >> "results/${{ matrix.key }}-resources.jsonl"
+              docker stats --no-stream --format '{{json .}}' llm-server >> "results/${{ matrix.key }}-resources.jsonl" || true
+              sleep 1
+            done
+          ) &
+          echo $! > results/sampler.pid
+
+      - name: Run benchmark
+        env:
+          PYTHONUNBUFFERED: '1'
+        run: |
+          python3 runner/benchmark.py \
+            --fixture "benchmark-fixtures/benchmarks/${{ inputs.fixture }}" \
+            --skill skills/small-fix/SKILL.md \
+            --model-key "${{ matrix.key }}" \
+            --repetitions "${{ inputs.repetitions }}" \
+            --output "results/${{ matrix.key }}.json"
+
+      - name: Capture diagnostics
+        if: always()
+        run: |
+          if [ -f results/sampler.pid ]; then kill "$(cat results/sampler.pid)" 2>/dev/null || true; fi
+          docker logs llm-server > "results/${{ matrix.key }}-server.log" 2>&1 || true
+
+      - name: Upload sanitized benchmark data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: result-${{ matrix.key }}
+          path: results/
+          retention-days: 1
+
+  aggregate:
+    if: always()
+    needs: [prepare, benchmark]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: result-*
+          path: downloaded
+      - name: Collect successful result files
+        run: |
+          mkdir -p results
+          find downloaded -type f -name '*.json' -not -name '*resources*' -exec cp {} results/ \;
+      - name: Build summary
+        run: |
+          python3 runner/aggregate.py | tee report.txt
+          cat report/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload aggregate
+        uses: actions/upload-artifact@v4
+        with:
+          name: aggregate-summary
+          path: report/
+          retention-days: 1
