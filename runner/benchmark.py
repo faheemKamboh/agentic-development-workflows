@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import argparse
 import json
-import os
 import re
 import shutil
 import subprocess
@@ -65,14 +64,14 @@ def run_tests(root, command):
     }
 
 
-def chat(endpoint, messages, seed):
+def chat(endpoint, messages, seed, max_tokens):
     started = time.perf_counter()
     data = post_json(endpoint.rstrip("/") + "/v1/chat/completions", {
         "model": "benchmark-model",
         "messages": messages,
         "temperature": 0.2,
         "top_p": 0.9,
-        "max_tokens": 500,
+        "max_tokens": max_tokens,
         "seed": seed,
     })
     elapsed = time.perf_counter() - started
@@ -82,15 +81,18 @@ def chat(endpoint, messages, seed):
     return choice, elapsed, usage, timings
 
 
-def one_run(source, task_text, skill_text, manifest, endpoint, seed, max_steps):
+def one_run(source, task_text, skill_text, manifest, endpoint, seed, max_steps, max_tokens, reasoning_mode):
     with tempfile.TemporaryDirectory(prefix="agent-bench-") as td:
         work = Path(td) / "workspace"
         shutil.copytree(source, work)
         test_command = manifest["test_command"]
         baseline = run_tests(work, test_command)
+        task_prompt = f"SKILL:\n{skill_text}\n\nTASK:\n{task_text}\n\nInitial file tree:\n" + "\n".join(tree(work))
+        if reasoning_mode == "no-think":
+            task_prompt += "\n\n/no_think"
         messages = [
             {"role": "system", "content": PROTOCOL},
-            {"role": "user", "content": f"SKILL:\n{skill_text}\n\nTASK:\n{task_text}\n\nInitial file tree:\n" + "\n".join(tree(work))},
+            {"role": "user", "content": task_prompt},
         ]
         started = time.perf_counter()
         tool_calls = invalid_actions = writes = model_seconds = 0
@@ -100,7 +102,7 @@ def one_run(source, task_text, skill_text, manifest, endpoint, seed, max_steps):
 
         for step in range(max_steps):
             try:
-                raw, elapsed, usage, timings = chat(endpoint, messages, seed + step)
+                raw, elapsed, usage, timings = chat(endpoint, messages, seed + step, max_tokens)
                 model_seconds += elapsed
                 for key in usage_total:
                     usage_total[key] += int(usage.get(key, 0) or 0)
@@ -175,6 +177,8 @@ def main():
     ap.add_argument("--endpoint", default="http://127.0.0.1:8080")
     ap.add_argument("--repetitions", type=int, default=10)
     ap.add_argument("--max-steps", type=int, default=8)
+    ap.add_argument("--max-tokens", type=int, default=160)
+    ap.add_argument("--reasoning-mode", choices=["auto", "no-think"], default="no-think")
     ap.add_argument("--output", required=True)
     args = ap.parse_args()
 
@@ -182,12 +186,20 @@ def main():
     manifest = json.loads((fixture / "benchmark.json").read_text())
     task = (fixture / "TASK.md").read_text()
     skill = Path(args.skill).read_text()
-    runs = [one_run(fixture, task, skill, manifest, args.endpoint, 1000 + i * 101, args.max_steps) for i in range(args.repetitions)]
+    runs = [
+        one_run(
+            fixture, task, skill, manifest, args.endpoint,
+            1000 + i * 101, args.max_steps, args.max_tokens, args.reasoning_mode,
+        )
+        for i in range(args.repetitions)
+    ]
     successes = sum(1 for r in runs if r["success"])
     result = {
         "model": args.model_key,
         "fixture": manifest.get("key"),
         "repetitions": args.repetitions,
+        "reasoning_mode": args.reasoning_mode,
+        "max_tokens": args.max_tokens,
         "successes": successes,
         "success_rate": successes / max(1, args.repetitions),
         "runs": runs,
