@@ -88,6 +88,7 @@ def one_run(source, task_text, skill_text, manifest, endpoint, seed, max_steps, 
         work = Path(td) / "workspace"
         shutil.copytree(source, work)
         test_command = manifest["test_command"]
+        editable_paths = set(manifest.get("editable_paths", []))
         baseline = run_tests(work, test_command)
         last_test = baseline
         task_prompt = (
@@ -95,6 +96,8 @@ def one_run(source, task_text, skill_text, manifest, endpoint, seed, max_steps, 
             + f"\n\nSKILL:\n{skill_text}\n\nTASK:\n{task_text}\n\nInitial file tree:\n"
             + "\n".join(tree(work))
         )
+        if editable_paths:
+            task_prompt += "\n\nOnly these files may be modified:\n" + "\n".join(sorted(editable_paths))
         if reasoning_mode == "no-think":
             task_prompt += "\n\n/no_think"
         messages = [{"role": "user", "content": task_prompt}]
@@ -131,12 +134,15 @@ def one_run(source, task_text, skill_text, manifest, endpoint, seed, max_steps, 
                     path = safe_path(work, action["path"])
                     result = {"path": action["path"], "content": path.read_text()[:12000]}
                 elif name in WRITE_ALIASES:
-                    path = safe_path(work, action["path"])
+                    rel = action["path"]
+                    if editable_paths and rel not in editable_paths:
+                        raise ValueError(f"write blocked by benchmark manifest: {rel}")
+                    path = safe_path(work, rel)
                     if not path.exists():
                         raise ValueError("benchmark permits replacement of existing files only")
                     path.write_text(action["content"])
                     writes += 1
-                    result = {"ok": True, "path": action["path"], "normalized_action": "write_file"}
+                    result = {"ok": True, "path": rel, "normalized_action": "write_file"}
                 elif name == "run_tests":
                     last_test = run_tests(work, test_command)
                     result = last_test
@@ -168,7 +174,7 @@ def one_run(source, task_text, skill_text, manifest, endpoint, seed, max_steps, 
                 changed.append(rel)
         return {
             "seed": seed,
-            "success": final_test["exit_code"] == 0,
+            "success": baseline["exit_code"] != 0 and final_test["exit_code"] == 0,
             "baseline_failed": baseline["exit_code"] != 0,
             "wall_seconds": round(time.perf_counter() - started, 4),
             "model_seconds": round(model_seconds, 4),
