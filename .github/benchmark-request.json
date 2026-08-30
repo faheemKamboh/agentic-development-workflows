@@ -1,0 +1,7 @@
+{
+  "enabled": true,
+  "profile": "core",
+  "repetitions": "3",
+  "fixture": "small-ruby",
+  "request_id": "smoke-core-small-ruby-001"
+}
