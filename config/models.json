@@ -1,0 +1,13 @@
+{
+  "models": [
+    {"key":"qwen3-0.6b","family":"qwen3","hf_repo":"Qwen/Qwen3-0.6B-GGUF","quant":"Q4_K_M","tier":"core"},
+    {"key":"qwen3-1.7b","family":"qwen3","hf_repo":"Qwen/Qwen3-1.7B-GGUF","quant":"Q4_K_M","tier":"core"},
+    {"key":"qwen3-4b","family":"qwen3","hf_repo":"Qwen/Qwen3-4B-GGUF","quant":"Q4_K_M","tier":"core"},
+    {"key":"qwen3.5-0.8b","family":"qwen3.5","hf_repo":"ggml-org/Qwen3.5-0.8B-GGUF","quant":"Q4_K_M","tier":"extended"},
+    {"key":"qwen3.5-2b","family":"qwen3.5","hf_repo":"bartowski/Qwen_Qwen3.5-2B-GGUF","quant":"Q4_K_M","tier":"extended"},
+    {"key":"qwen3.5-4b","family":"qwen3.5","hf_repo":"bartowski/Qwen_Qwen3.5-4B-GGUF","quant":"Q4_K_M","tier":"extended"},
+    {"key":"smollm2-360m","family":"smollm2","hf_repo":"unsloth/SmolLM2-360M-Instruct-GGUF","quant":"Q4_K_M","tier":"extended"},
+    {"key":"smollm2-1.7b","family":"smollm2","hf_repo":"second-state/SmolLM2-1.7B-Instruct-GGUF","quant":"Q4_K_M","tier":"extended"},
+    {"key":"phi4-mini-3.8b","family":"phi4","hf_repo":"tensorblock/Phi-4-mini-instruct-GGUF","quant":"Q4_K_M","tier":"extended"}
+  ]
+}
