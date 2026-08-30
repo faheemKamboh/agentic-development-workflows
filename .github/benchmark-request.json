@@ -1,7 +1,8 @@
 {
   "enabled": true,
-  "profile": "core",
+  "profile": "selection",
   "repetitions": "3",
   "fixture": "small-ruby",
-  "request_id": "smoke-core-small-ruby-001"
+  "reasoning_mode": "auto",
+  "request_id": "model-selection-001"
 }
