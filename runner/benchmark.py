@@ -90,13 +90,16 @@ def one_run(source, task_text, skill_text, manifest, endpoint, seed, max_steps, 
         test_command = manifest["test_command"]
         baseline = run_tests(work, test_command)
         last_test = baseline
-        task_prompt = f"SKILL:\n{skill_text}\n\nTASK:\n{task_text}\n\nInitial file tree:\n" + "\n".join(tree(work))
+        task_prompt = (
+            PROTOCOL
+            + f"\n\nSKILL:\n{skill_text}\n\nTASK:\n{task_text}\n\nInitial file tree:\n"
+            + "\n".join(tree(work))
+        )
         if reasoning_mode == "no-think":
             task_prompt += "\n\n/no_think"
-        messages = [
-            {"role": "system", "content": PROTOCOL},
-            {"role": "user", "content": task_prompt},
-        ]
+        # Keep protocol inside the user message so models whose native chat
+        # template does not support a separate system role can be compared fairly.
+        messages = [{"role": "user", "content": task_prompt}]
         started = time.perf_counter()
         tool_calls = invalid_actions = writes = model_seconds = 0
         usage_total = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
@@ -104,6 +107,7 @@ def one_run(source, task_text, skill_text, manifest, endpoint, seed, max_steps, 
         transcript = []
 
         for step in range(max_steps):
+            raw = ""
             try:
                 raw, elapsed, usage, timings = chat(endpoint, messages, seed + step, max_tokens)
                 model_seconds += elapsed
@@ -114,9 +118,9 @@ def one_run(source, task_text, skill_text, manifest, endpoint, seed, max_steps, 
                 action = parse_object(raw)
             except Exception as exc:
                 invalid_actions += 1
-                transcript.append({"step": step + 1, "error": str(exc)})
-                messages.append({"role": "assistant", "content": raw if 'raw' in locals() else ""})
-                messages.append({"role": "user", "content": "Invalid response. Return exactly one allowed JSON action."})
+                transcript.append({"step": step + 1, "error": str(exc), "raw": raw[:1000]})
+                messages.append({"role": "assistant", "content": raw})
+                messages.append({"role": "user", "content": "Invalid response. Return exactly one allowed JSON action and nothing else."})
                 continue
 
             transcript.append({"step": step + 1, "action": action})
