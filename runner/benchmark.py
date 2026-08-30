@@ -97,8 +97,6 @@ def one_run(source, task_text, skill_text, manifest, endpoint, seed, max_steps, 
         )
         if reasoning_mode == "no-think":
             task_prompt += "\n\n/no_think"
-        # Keep protocol inside the user message so models whose native chat
-        # template does not support a separate system role can be compared fairly.
         messages = [{"role": "user", "content": task_prompt}]
         started = time.perf_counter()
         tool_calls = invalid_actions = writes = model_seconds = 0
@@ -192,8 +190,8 @@ def main():
     ap.add_argument("--model-key", required=True)
     ap.add_argument("--endpoint", default="http://127.0.0.1:8080")
     ap.add_argument("--repetitions", type=int, default=3)
-    ap.add_argument("--max-steps", type=int, default=12)
-    ap.add_argument("--max-tokens", type=int, default=256)
+    ap.add_argument("--max-steps", type=int, default=8)
+    ap.add_argument("--max-tokens", type=int, default=192)
     ap.add_argument("--reasoning-mode", choices=["auto", "no-think"], default="auto")
     ap.add_argument("--output", required=True)
     args = ap.parse_args()
