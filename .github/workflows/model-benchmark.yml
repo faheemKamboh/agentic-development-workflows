@@ -55,6 +55,14 @@ jobs:
       max-parallel: 9
       matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
     steps:
+      - name: Check private result sink
+        env:
+          CONTROL_REPO: ${{ secrets.CONTROL_REPO }}
+          CONTROL_REPO_TOKEN: ${{ secrets.CONTROL_REPO_TOKEN }}
+        run: |
+          test -n "$CONTROL_REPO" || { echo 'Private result sink is not configured.'; exit 1; }
+          test -n "$CONTROL_REPO_TOKEN" || { echo 'Private result sink is not configured.'; exit 1; }
+
       - name: Checkout runner
         uses: actions/checkout@v5
 
@@ -122,44 +130,87 @@ jobs:
             --skill skills/small-fix/SKILL.md \
             --model-key "${{ matrix.key }}" \
             --repetitions "${{ inputs.repetitions }}" \
-            --output "results/${{ matrix.key }}.json"
+            --output "results/${{ matrix.key }}.json" \
+            > "results/${{ matrix.key }}-runner.log" 2>&1
 
       - name: Capture diagnostics
         if: always()
         run: |
+          mkdir -p results
           if [ -f results/sampler.pid ]; then kill "$(cat results/sampler.pid)" 2>/dev/null || true; fi
           docker logs llm-server > "results/${{ matrix.key }}-server.log" 2>&1 || true
           docker stop llm-server >/dev/null 2>&1 || true
 
-      - name: Upload sanitized benchmark data
+      - name: Persist results privately
         if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: result-${{ matrix.key }}
-          path: results/
-          retention-days: 1
+        env:
+          GH_TOKEN: ${{ secrets.CONTROL_REPO_TOKEN }}
+          CONTROL_REPO: ${{ secrets.CONTROL_REPO }}
+          MODEL_KEY: ${{ matrix.key }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          tar -czf "/tmp/${MODEL_KEY}.tgz" results
+          content=$(base64 -w0 "/tmp/${MODEL_KEY}.tgz")
+          gh api --method PUT \
+            "repos/${CONTROL_REPO}/contents/benchmark-results/${RUN_ID}/raw/${MODEL_KEY}.tgz" \
+            -f message="Store benchmark run ${RUN_ID} result" \
+            -f content="$content" >/dev/null
 
   aggregate:
     if: always()
     needs: [prepare, benchmark]
     runs-on: ubuntu-latest
     steps:
+      - name: Check private result sink
+        env:
+          CONTROL_REPO: ${{ secrets.CONTROL_REPO }}
+          CONTROL_REPO_TOKEN: ${{ secrets.CONTROL_REPO_TOKEN }}
+        run: |
+          test -n "$CONTROL_REPO" || exit 1
+          test -n "$CONTROL_REPO_TOKEN" || exit 1
+
       - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: result-*
-          path: downloaded
-      - name: Collect successful result files
+
+      - name: Download private raw results
+        env:
+          GH_TOKEN: ${{ secrets.CONTROL_REPO_TOKEN }}
+          CONTROL_REPO: ${{ secrets.CONTROL_REPO }}
+          PROFILE: ${{ inputs.profile }}
+          RUN_ID: ${{ github.run_id }}
         run: |
-          mkdir -p results
-          find downloaded -type f -name '*.json' -exec cp {} results/ \;
-      - name: Build summary
+          mkdir -p downloaded results
+          python3 - <<'PY' > /tmp/model-keys
+          import json, os
+          models = json.load(open('config/models.json'))['models']
+          profile = os.environ['PROFILE']
+          for m in models:
+              if profile == 'extended' or m['tier'] == 'core':
+                  print(m['key'])
+          PY
+          while read -r key; do
+            if gh api -H 'Accept: application/vnd.github.raw+json' \
+              "repos/${CONTROL_REPO}/contents/benchmark-results/${RUN_ID}/raw/${key}.tgz" \
+              > "downloaded/${key}.tgz" 2>/dev/null; then
+              mkdir -p "downloaded/${key}"
+              tar -xzf "downloaded/${key}.tgz" -C "downloaded/${key}"
+              find "downloaded/${key}" -type f -name "${key}.json" -exec cp {} results/ \;
+            fi
+          done < /tmp/model-keys
+
+      - name: Build private summary
+        run: python3 runner/aggregate.py > /dev/null
+
+      - name: Persist aggregate privately
+        env:
+          GH_TOKEN: ${{ secrets.CONTROL_REPO_TOKEN }}
+          CONTROL_REPO: ${{ secrets.CONTROL_REPO }}
+          RUN_ID: ${{ github.run_id }}
         run: |
-          python3 runner/aggregate.py | tee report.txt
-          cat report/summary.md >> "$GITHUB_STEP_SUMMARY"
-      - name: Upload aggregate
-        uses: actions/upload-artifact@v4
-        with:
-          name: aggregate-summary
-          path: report/
-          retention-days: 1
+          for file in report/summary.json report/summary.md; do
+            name=$(basename "$file")
+            content=$(base64 -w0 "$file")
+            gh api --method PUT \
+              "repos/${CONTROL_REPO}/contents/benchmark-results/${RUN_ID}/${name}" \
+              -f message="Store benchmark run ${RUN_ID} aggregate" \
+              -f content="$content" >/dev/null
+          done
