@@ -1,0 +1,74 @@
+name: Recover benchmark results
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/result-aggregation-request.json'
+
+permissions:
+  contents: read
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Recover private benchmark results
+        env:
+          GH_TOKEN: ${{ secrets.CONTROL_REPO_TOKEN }}
+          CONTROL_REPO: ${{ secrets.CONTROL_REPO }}
+        run: |
+          set -euo pipefail
+          test -n "$CONTROL_REPO"
+          test -n "$GH_TOKEN"
+          RUN_ID=$(python3 -c "import json; print(json.load(open('.github/result-aggregation-request.json'))['run_id'])")
+          PROFILE=$(python3 -c "import json; print(json.load(open('.github/result-aggregation-request.json')).get('profile','core'))")
+          mkdir -p downloaded results report
+
+          python3 - <<'PY' > /tmp/model-keys
+          import json, os
+          req = json.load(open('.github/result-aggregation-request.json'))
+          profile = req.get('profile', 'core')
+          models = json.load(open('config/models.json'))['models']
+          for m in models:
+              if profile == 'extended' or m['tier'] == 'core':
+                  print(m['key'])
+          PY
+
+          while read -r key; do
+            meta="/tmp/${key}.json"
+            if gh api "repos/${CONTROL_REPO}/contents/benchmark-results/${RUN_ID}/raw/${key}.tgz" > "$meta" 2>/dev/null; then
+              python3 - "$meta" "downloaded/${key}.tgz" <<'PY'
+          import base64, json, sys
+          meta = json.load(open(sys.argv[1]))
+          content = meta.get('content') or ''
+          if not content:
+              raise SystemExit('archive content missing')
+          open(sys.argv[2], 'wb').write(base64.b64decode(content))
+          PY
+              mkdir -p "downloaded/${key}"
+              tar -xzf "downloaded/${key}.tgz" -C "downloaded/${key}"
+              found=$(find "downloaded/${key}" -type f -name "${key}.json" -print -quit)
+              if [ -n "$found" ]; then
+                cp "$found" "results/${key}.json"
+                encoded=$(base64 -w0 "results/${key}.json")
+                gh api --method PUT \
+                  "repos/${CONTROL_REPO}/contents/benchmark-results/${RUN_ID}/recovered/${key}.json" \
+                  -f message="Recover benchmark result ${RUN_ID} ${key}" \
+                  -f content="$encoded" >/dev/null
+              fi
+            fi
+          done < /tmp/model-keys
+
+          python3 runner/aggregate.py >/dev/null
+
+          for file in report/summary.json report/summary.md; do
+            name=$(basename "$file")
+            encoded=$(base64 -w0 "$file")
+            gh api --method PUT \
+              "repos/${CONTROL_REPO}/contents/benchmark-results/${RUN_ID}/recovered/${name}" \
+              -f message="Recover benchmark aggregate ${RUN_ID}" \
+              -f content="$encoded" >/dev/null
+          done
