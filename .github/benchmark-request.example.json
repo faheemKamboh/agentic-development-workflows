@@ -1,0 +1,7 @@
+{
+  "enabled": true,
+  "profile": "core",
+  "repetitions": "3",
+  "fixture": "small-ruby",
+  "request_id": "change-this-value-to-rerun-the-same-configuration"
+}
