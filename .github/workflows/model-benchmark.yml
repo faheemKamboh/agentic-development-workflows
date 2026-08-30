@@ -6,8 +6,8 @@ on:
       profile:
         description: Model set
         type: choice
-        options: [core, selection]
-        default: selection
+        options: [core, selection, finalists]
+        default: finalists
       repetitions:
         description: Repetitions per model
         type: choice
@@ -16,8 +16,8 @@ on:
       fixture:
         description: Public benchmark fixture
         type: choice
-        options: [small-ruby]
-        default: small-ruby
+        options: [small-ruby, medium-ruby]
+        default: medium-ruby
       reasoning_mode:
         description: Reasoning mode
         type: choice
@@ -33,7 +33,7 @@ permissions:
 
 concurrency:
   group: model-benchmark-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   prepare:
@@ -44,6 +44,8 @@ jobs:
       repetitions: ${{ steps.config.outputs.repetitions }}
       fixture: ${{ steps.config.outputs.fixture }}
       reasoning_mode: ${{ steps.config.outputs.reasoning_mode }}
+      max_steps: ${{ steps.config.outputs.max_steps }}
+      max_tokens: ${{ steps.config.outputs.max_tokens }}
       matrix: ${{ steps.models.outputs.matrix }}
     steps:
       - uses: actions/checkout@v5
@@ -63,9 +65,9 @@ jobs:
 
           if os.environ['EVENT_NAME'] == 'workflow_dispatch':
               request = {
-                  'profile': os.environ.get('INPUT_PROFILE') or 'selection',
+                  'profile': os.environ.get('INPUT_PROFILE') or 'finalists',
                   'repetitions': os.environ.get('INPUT_REPETITIONS') or '3',
-                  'fixture': os.environ.get('INPUT_FIXTURE') or 'small-ruby',
+                  'fixture': os.environ.get('INPUT_FIXTURE') or 'medium-ruby',
                   'reasoning_mode': os.environ.get('INPUT_REASONING') or 'auto',
                   'enabled': True,
               }
@@ -75,27 +77,31 @@ jobs:
               request.setdefault('enabled', True)
 
           enabled = bool(request.get('enabled'))
-          profile = str(request.get('profile', 'selection'))
+          profile = str(request.get('profile', 'finalists'))
           repetitions = str(request.get('repetitions', '3'))
-          fixture = str(request.get('fixture', 'small-ruby'))
+          fixture = str(request.get('fixture', 'medium-ruby'))
           reasoning_mode = str(request.get('reasoning_mode', 'auto'))
 
           if enabled:
-              if profile not in {'core', 'selection'}:
+              if profile not in {'core', 'selection', 'finalists'}:
                   raise SystemExit(f'unsupported profile: {profile}')
               if repetitions not in {'3', '5', '10'}:
                   raise SystemExit(f'unsupported repetitions: {repetitions}')
-              if fixture != 'small-ruby':
+              if fixture not in {'small-ruby', 'medium-ruby'}:
                   raise SystemExit(f'unsupported fixture: {fixture}')
               if reasoning_mode not in {'auto', 'no-think'}:
                   raise SystemExit(f'unsupported reasoning mode: {reasoning_mode}')
 
+          max_steps = '12' if fixture == 'medium-ruby' else '8'
+          max_tokens = '256' if fixture == 'medium-ruby' else '192'
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
               f.write(f"enabled={'true' if enabled else 'false'}\n")
               f.write(f'profile={profile}\n')
               f.write(f'repetitions={repetitions}\n')
               f.write(f'fixture={fixture}\n')
               f.write(f'reasoning_mode={reasoning_mode}\n')
+              f.write(f'max_steps={max_steps}\n')
+              f.write(f'max_tokens={max_tokens}\n')
           PY
 
       - id: models
@@ -107,8 +113,14 @@ jobs:
           import json, os
           models = json.load(open('config/models.json'))['models']
           profile = os.environ['PROFILE']
-          core = {'qwen3-0.6b', 'qwen3-1.7b', 'qwen3-4b'}
-          selected = models if profile == 'selection' else [m for m in models if m['key'] in core]
+          core = {'qwen2.5-coder-0.5b', 'qwen2.5-coder-1.5b', 'qwen2.5-coder-3b', 'qwen2.5-coder-7b'}
+          finalists = {'llama3.2-3b', 'qwen2.5-coder-7b'}
+          if profile == 'selection':
+              selected = models
+          elif profile == 'finalists':
+              selected = [m for m in models if m['key'] in finalists]
+          else:
+              selected = [m for m in models if m['key'] in core]
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
               f.write('matrix=' + json.dumps({'include': selected}, separators=(',', ':')) + '\n')
           PY
@@ -120,7 +132,7 @@ jobs:
     timeout-minutes: 45
     strategy:
       fail-fast: false
-      max-parallel: 7
+      max-parallel: 2
       matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
     steps:
       - name: Check private result sink
@@ -164,7 +176,6 @@ jobs:
 
       - name: Start model server
         env:
-          HF_FILE: ${{ matrix.hf_file }}
           MODEL_KEY: ${{ matrix.key }}
         run: |
           docker pull ghcr.io/ggml-org/llama.cpp:server
@@ -221,6 +232,8 @@ jobs:
             --model-key "${{ matrix.key }}" \
             --repetitions "${{ needs.prepare.outputs.repetitions }}" \
             --reasoning-mode "${{ needs.prepare.outputs.reasoning_mode }}" \
+            --max-steps "${{ needs.prepare.outputs.max_steps }}" \
+            --max-tokens "${{ needs.prepare.outputs.max_tokens }}" \
             --output "results/${{ matrix.key }}.json" \
             > "results/${{ matrix.key }}-runner.log" 2>&1
 
@@ -292,9 +305,11 @@ jobs:
           python3 - <<'PY' > /tmp/model-keys
           import json, os
           models = json.load(open('config/models.json'))['models']
-          core = {'qwen3-0.6b', 'qwen3-1.7b', 'qwen3-4b'}
+          profile = os.environ['PROFILE']
+          core = {'qwen2.5-coder-0.5b', 'qwen2.5-coder-1.5b', 'qwen2.5-coder-3b', 'qwen2.5-coder-7b'}
+          finalists = {'llama3.2-3b', 'qwen2.5-coder-7b'}
           for m in models:
-              if os.environ['PROFILE'] == 'selection' or m['key'] in core:
+              if profile == 'selection' or (profile == 'finalists' and m['key'] in finalists) or (profile == 'core' and m['key'] in core):
                   print(m['key'])
           PY
           while read -r key; do
