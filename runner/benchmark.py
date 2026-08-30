@@ -16,7 +16,9 @@ Allowed actions:
 {"action":"write_file","path":"relative/path","content":"complete replacement content"}
 {"action":"run_tests"}
 {"action":"finish","summary":"short summary"}
-Never invent tool results. Read relevant files before editing. Prefer the smallest correct change. Do not touch files outside the workspace.'''
+Never invent tool results. Read relevant files before editing. Prefer the smallest correct change. Do not touch files outside the workspace. If the task requires a code fix, do not finish until you have written the change and verified that tests pass.'''
+
+WRITE_ALIASES = {"write_file", "edit_file", "fix_file", "replace_file"}
 
 
 def post_json(url, payload, timeout=180):
@@ -87,6 +89,7 @@ def one_run(source, task_text, skill_text, manifest, endpoint, seed, max_steps, 
         shutil.copytree(source, work)
         test_command = manifest["test_command"]
         baseline = run_tests(work, test_command)
+        last_test = baseline
         task_prompt = f"SKILL:\n{skill_text}\n\nTASK:\n{task_text}\n\nInitial file tree:\n" + "\n".join(tree(work))
         if reasoning_mode == "no-think":
             task_prompt += "\n\n/no_think"
@@ -125,20 +128,29 @@ def one_run(source, task_text, skill_text, manifest, endpoint, seed, max_steps, 
                 elif name == "read_file":
                     path = safe_path(work, action["path"])
                     result = {"path": action["path"], "content": path.read_text()[:12000]}
-                elif name == "write_file":
+                elif name in WRITE_ALIASES:
                     path = safe_path(work, action["path"])
                     if not path.exists():
                         raise ValueError("benchmark permits replacement of existing files only")
                     path.write_text(action["content"])
                     writes += 1
-                    result = {"ok": True, "path": action["path"]}
+                    result = {"ok": True, "path": action["path"], "normalized_action": "write_file"}
                 elif name == "run_tests":
-                    result = run_tests(work, test_command)
+                    last_test = run_tests(work, test_command)
+                    result = last_test
                 elif name == "finish":
-                    break
+                    if baseline["exit_code"] != 0 and writes == 0:
+                        result = {"error": "Cannot finish: no code change has been written. Make the smallest correct change, then verify it."}
+                    else:
+                        last_test = run_tests(work, test_command)
+                        if last_test["exit_code"] != 0:
+                            result = {"error": "Cannot finish: tests still fail. Inspect the failure and continue fixing.", "test_result": last_test}
+                        else:
+                            tool_calls += 1
+                            break
                 else:
                     invalid_actions += 1
-                    result = {"error": "unsupported action"}
+                    result = {"error": "unsupported action; use one of list_files, read_file, write_file, run_tests, finish"}
                 tool_calls += 1
             except Exception as exc:
                 invalid_actions += 1
@@ -175,10 +187,10 @@ def main():
     ap.add_argument("--skill", required=True)
     ap.add_argument("--model-key", required=True)
     ap.add_argument("--endpoint", default="http://127.0.0.1:8080")
-    ap.add_argument("--repetitions", type=int, default=10)
-    ap.add_argument("--max-steps", type=int, default=8)
-    ap.add_argument("--max-tokens", type=int, default=160)
-    ap.add_argument("--reasoning-mode", choices=["auto", "no-think"], default="no-think")
+    ap.add_argument("--repetitions", type=int, default=3)
+    ap.add_argument("--max-steps", type=int, default=12)
+    ap.add_argument("--max-tokens", type=int, default=256)
+    ap.add_argument("--reasoning-mode", choices=["auto", "no-think"], default="auto")
     ap.add_argument("--output", required=True)
     args = ap.parse_args()
 
