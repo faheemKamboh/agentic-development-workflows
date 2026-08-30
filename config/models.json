@@ -1,7 +1,7 @@
 {
   "models": [
-    {"key":"qwen3-0.6b","family":"qwen3","hf_repo":"Qwen/Qwen3-0.6B-GGUF","quant":"Q4_K_M","tier":"core"},
-    {"key":"qwen3-1.7b","family":"qwen3","hf_repo":"Qwen/Qwen3-1.7B-GGUF","quant":"Q4_K_M","tier":"core"},
+    {"key":"qwen3-0.6b","family":"qwen3","hf_repo":"tensorblock/Qwen_Qwen3-0.6B-GGUF","quant":"Q4_K_M","tier":"core"},
+    {"key":"qwen3-1.7b","family":"qwen3","hf_repo":"ggml-org/Qwen3-1.7B-GGUF","quant":"Q4_K_M","tier":"core"},
     {"key":"qwen3-4b","family":"qwen3","hf_repo":"Qwen/Qwen3-4B-GGUF","quant":"Q4_K_M","tier":"core"},
     {"key":"qwen3.5-0.8b","family":"qwen3.5","hf_repo":"ggml-org/Qwen3.5-0.8B-GGUF","quant":"Q4_K_M","tier":"extended"},
     {"key":"qwen3.5-2b","family":"qwen3.5","hf_repo":"bartowski/Qwen_Qwen3.5-2B-GGUF","quant":"Q4_K_M","tier":"extended"},
