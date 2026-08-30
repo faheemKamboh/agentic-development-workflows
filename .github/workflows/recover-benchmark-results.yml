@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Recover private benchmark results
+      - name: Recover and enrich private benchmark results
         env:
           GH_TOKEN: ${{ secrets.CONTROL_REPO_TOKEN }}
           CONTROL_REPO: ${{ secrets.CONTROL_REPO }}
@@ -24,11 +24,11 @@ jobs:
           test -n "$CONTROL_REPO"
           test -n "$GH_TOKEN"
           RUN_ID=$(python3 -c "import json; print(json.load(open('.github/result-aggregation-request.json'))['run_id'])")
-          PROFILE=$(python3 -c "import json; print(json.load(open('.github/result-aggregation-request.json')).get('profile','core'))")
+          DEST=$(python3 -c "import json; print(json.load(open('.github/result-aggregation-request.json')).get('destination','analysis-v1'))")
           mkdir -p downloaded results report
 
           python3 - <<'PY' > /tmp/model-keys
-          import json, os
+          import json
           req = json.load(open('.github/result-aggregation-request.json'))
           profile = req.get('profile', 'core')
           models = json.load(open('config/models.json'))['models']
@@ -38,7 +38,7 @@ jobs:
           PY
 
           while read -r key; do
-            meta="/tmp/${key}.json"
+            meta="/tmp/${key}.meta.json"
             if gh api "repos/${CONTROL_REPO}/contents/benchmark-results/${RUN_ID}/raw/${key}.tgz" > "$meta" 2>/dev/null; then
               python3 - "$meta" "downloaded/${key}.tgz" <<'PY'
           import base64, json, sys
@@ -51,12 +51,16 @@ jobs:
               mkdir -p "downloaded/${key}"
               tar -xzf "downloaded/${key}.tgz" -C "downloaded/${key}"
               found=$(find "downloaded/${key}" -type f -name "${key}.json" -print -quit)
+              resources=$(find "downloaded/${key}" -type f -name "${key}-resources.tsv" -print -quit)
               if [ -n "$found" ]; then
+                if [ -n "$resources" ]; then
+                  python3 runner/enrich.py --result "$found" --resources "$resources" --startup "/tmp/${key}-startup.json"
+                fi
                 cp "$found" "results/${key}.json"
                 encoded=$(base64 -w0 "results/${key}.json")
                 gh api --method PUT \
-                  "repos/${CONTROL_REPO}/contents/benchmark-results/${RUN_ID}/recovered/${key}.json" \
-                  -f message="Recover benchmark result ${RUN_ID} ${key}" \
+                  "repos/${CONTROL_REPO}/contents/benchmark-results/${RUN_ID}/${DEST}/${key}.json" \
+                  -f message="Analyze benchmark result ${RUN_ID} ${key}" \
                   -f content="$encoded" >/dev/null
               fi
             fi
@@ -68,7 +72,7 @@ jobs:
             name=$(basename "$file")
             encoded=$(base64 -w0 "$file")
             gh api --method PUT \
-              "repos/${CONTROL_REPO}/contents/benchmark-results/${RUN_ID}/recovered/${name}" \
-              -f message="Recover benchmark aggregate ${RUN_ID}" \
+              "repos/${CONTROL_REPO}/contents/benchmark-results/${RUN_ID}/${DEST}/${name}" \
+              -f message="Analyze benchmark aggregate ${RUN_ID}" \
               -f content="$encoded" >/dev/null
           done
