@@ -104,8 +104,10 @@ jobs:
         run: |
           (
             while docker inspect llm-server >/dev/null 2>&1; do
-              printf '{"sampled_at":"%s","stats":' "$(date -u +%FT%TZ)" >> "results/${{ matrix.key }}-resources.jsonl"
-              docker stats --no-stream --format '{{json .}}' llm-server >> "results/${{ matrix.key }}-resources.jsonl" || true
+              printf '%s\t%s\n' \
+                "$(date -u +%FT%TZ)" \
+                "$(docker stats --no-stream --format '{{json .}}' llm-server 2>/dev/null || echo '{}')" \
+                >> "results/${{ matrix.key }}-resources.tsv"
               sleep 1
             done
           ) &
@@ -127,6 +129,7 @@ jobs:
         run: |
           if [ -f results/sampler.pid ]; then kill "$(cat results/sampler.pid)" 2>/dev/null || true; fi
           docker logs llm-server > "results/${{ matrix.key }}-server.log" 2>&1 || true
+          docker stop llm-server >/dev/null 2>&1 || true
 
       - name: Upload sanitized benchmark data
         if: always()
@@ -149,7 +152,7 @@ jobs:
       - name: Collect successful result files
         run: |
           mkdir -p results
-          find downloaded -type f -name '*.json' -not -name '*resources*' -exec cp {} results/ \;
+          find downloaded -type f -name '*.json' -exec cp {} results/ \;
       - name: Build summary
         run: |
           python3 runner/aggregate.py | tee report.txt
