@@ -1,13 +1,11 @@
 {
   "models": [
-    {"key":"qwen3-0.6b","family":"qwen3","hf_repo":"smarttasks/Qwen3-0.6B-GGUF","hf_file":"Qwen3-0.6B-Q4_K_M.gguf","sha256":"3479875d3e4c726f7a20b2181f5e1536aefe9925f284f9ae9997a39a7e0d8dc9","quant":"Q4_K_M","tier":"core"},
-    {"key":"qwen3-1.7b","family":"qwen3","hf_repo":"ggml-org/Qwen3-1.7B-GGUF","hf_file":"Qwen3-1.7B-Q4_K_M.gguf","sha256":"d2387ca2dbfee2ffabce7120d3770dadca0b293052bc2f0e138fdc940d9bc7b5","quant":"Q4_K_M","tier":"core"},
-    {"key":"qwen3-4b","family":"qwen3","hf_repo":"Qwen/Qwen3-4B-GGUF","hf_file":"Qwen3-4B-Q4_K_M.gguf","sha256":"7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5","quant":"Q4_K_M","tier":"core"},
-    {"key":"qwen3.5-0.8b","family":"qwen3.5","hf_repo":"ggml-org/Qwen3.5-0.8B-GGUF","quant":"Q4_K_M","tier":"extended"},
-    {"key":"qwen3.5-2b","family":"qwen3.5","hf_repo":"bartowski/Qwen_Qwen3.5-2B-GGUF","quant":"Q4_K_M","tier":"extended"},
-    {"key":"qwen3.5-4b","family":"qwen3.5","hf_repo":"bartowski/Qwen_Qwen3.5-4B-GGUF","quant":"Q4_K_M","tier":"extended"},
-    {"key":"smollm2-360m","family":"smollm2","hf_repo":"unsloth/SmolLM2-360M-Instruct-GGUF","quant":"Q4_K_M","tier":"extended"},
-    {"key":"smollm2-1.7b","family":"smollm2","hf_repo":"second-state/SmolLM2-1.7B-Instruct-GGUF","quant":"Q4_K_M","tier":"extended"},
-    {"key":"phi4-mini-3.8b","family":"phi4","hf_repo":"tensorblock/Phi-4-mini-instruct-GGUF","quant":"Q4_K_M","tier":"extended"}
+    {"key":"qwen3-0.6b","family":"qwen3","hf_repo":"smarttasks/Qwen3-0.6B-GGUF","hf_file":"Qwen3-0.6B-Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"},
+    {"key":"qwen3-1.7b","family":"qwen3","hf_repo":"ggml-org/Qwen3-1.7B-GGUF","hf_file":"Qwen3-1.7B-Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"},
+    {"key":"qwen3-4b","family":"qwen3","hf_repo":"Qwen/Qwen3-4B-GGUF","hf_file":"Qwen3-4B-Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"},
+    {"key":"qwen3.5-0.8b","family":"qwen3.5","hf_repo":"bartowski/Qwen_Qwen3.5-0.8B-GGUF","hf_file":"Qwen_Qwen3.5-0.8B-Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"},
+    {"key":"qwen3.5-2b","family":"qwen3.5","hf_repo":"bartowski/Qwen_Qwen3.5-2B-GGUF","hf_file":"Qwen_Qwen3.5-2B-Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"},
+    {"key":"qwen3.5-4b","family":"qwen3.5","hf_repo":"bartowski/Qwen_Qwen3.5-4B-GGUF","hf_file":"Qwen_Qwen3.5-4B-Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"},
+    {"key":"phi4-mini-3.8b","family":"phi4","hf_repo":"tensorblock/Phi-4-mini-instruct-GGUF","hf_file":"Phi-4-mini-instruct-Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"}
   ]
 }
