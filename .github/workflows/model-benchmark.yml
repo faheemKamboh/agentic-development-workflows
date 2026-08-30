@@ -18,6 +18,10 @@ on:
         type: choice
         options: [small-ruby]
         default: small-ruby
+  push:
+    branches: [main]
+    paths:
+      - '.github/benchmark-request.json'
 
 permissions:
   contents: read
@@ -30,12 +34,65 @@ jobs:
   prepare:
     runs-on: ubuntu-latest
     outputs:
+      enabled: ${{ steps.config.outputs.enabled }}
+      profile: ${{ steps.config.outputs.profile }}
+      repetitions: ${{ steps.config.outputs.repetitions }}
+      fixture: ${{ steps.config.outputs.fixture }}
       matrix: ${{ steps.models.outputs.matrix }}
     steps:
       - uses: actions/checkout@v5
-      - id: models
+
+      - id: config
+        name: Resolve benchmark request
         env:
-          PROFILE: ${{ inputs.profile }}
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_PROFILE: ${{ inputs.profile }}
+          INPUT_REPETITIONS: ${{ inputs.repetitions }}
+          INPUT_FIXTURE: ${{ inputs.fixture }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+
+          if os.environ['EVENT_NAME'] == 'workflow_dispatch':
+              request = {
+                  'profile': os.environ.get('INPUT_PROFILE') or 'core',
+                  'repetitions': os.environ.get('INPUT_REPETITIONS') or '10',
+                  'fixture': os.environ.get('INPUT_FIXTURE') or 'small-ruby',
+                  'enabled': True,
+              }
+          else:
+              path = Path('.github/benchmark-request.json')
+              if not path.exists() or not path.read_text().strip():
+                  request = {'enabled': False}
+              else:
+                  request = json.loads(path.read_text())
+                  request.setdefault('enabled', True)
+
+          enabled = bool(request.get('enabled'))
+          profile = str(request.get('profile', 'core'))
+          repetitions = str(request.get('repetitions', '3'))
+          fixture = str(request.get('fixture', 'small-ruby'))
+
+          if enabled:
+              if profile not in {'core', 'extended'}:
+                  raise SystemExit(f'unsupported profile: {profile}')
+              if repetitions not in {'3', '5', '10'}:
+                  raise SystemExit(f'unsupported repetitions: {repetitions}')
+              if fixture not in {'small-ruby'}:
+                  raise SystemExit(f'unsupported fixture: {fixture}')
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f"enabled={'true' if enabled else 'false'}\n")
+              f.write(f'profile={profile}\n')
+              f.write(f'repetitions={repetitions}\n')
+              f.write(f'fixture={fixture}\n')
+          PY
+
+      - id: models
+        if: steps.config.outputs.enabled == 'true'
+        env:
+          PROFILE: ${{ steps.config.outputs.profile }}
         run: |
           python3 - <<'PY'
           import json, os
@@ -47,6 +104,7 @@ jobs:
           PY
 
   benchmark:
+    if: needs.prepare.outputs.enabled == 'true'
     needs: prepare
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -126,10 +184,10 @@ jobs:
           PYTHONUNBUFFERED: '1'
         run: |
           python3 runner/benchmark.py \
-            --fixture "benchmark-fixtures/benchmarks/${{ inputs.fixture }}" \
+            --fixture "benchmark-fixtures/benchmarks/${{ needs.prepare.outputs.fixture }}" \
             --skill skills/small-fix/SKILL.md \
             --model-key "${{ matrix.key }}" \
-            --repetitions "${{ inputs.repetitions }}" \
+            --repetitions "${{ needs.prepare.outputs.repetitions }}" \
             --output "results/${{ matrix.key }}.json" \
             > "results/${{ matrix.key }}-runner.log" 2>&1
 
@@ -157,7 +215,7 @@ jobs:
             -f content="$content" >/dev/null
 
   aggregate:
-    if: always()
+    if: ${{ always() && needs.prepare.outputs.enabled == 'true' }}
     needs: [prepare, benchmark]
     runs-on: ubuntu-latest
     steps:
@@ -175,7 +233,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.CONTROL_REPO_TOKEN }}
           CONTROL_REPO: ${{ secrets.CONTROL_REPO }}
-          PROFILE: ${{ inputs.profile }}
+          PROFILE: ${{ needs.prepare.outputs.profile }}
           RUN_ID: ${{ github.run_id }}
         run: |
           mkdir -p downloaded results
