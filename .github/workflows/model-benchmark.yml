@@ -6,18 +6,23 @@ on:
       profile:
         description: Model set
         type: choice
-        options: [core, extended]
-        default: core
+        options: [core, selection]
+        default: selection
       repetitions:
         description: Repetitions per model
         type: choice
         options: ['3', '5', '10']
-        default: '10'
+        default: '3'
       fixture:
         description: Public benchmark fixture
         type: choice
         options: [small-ruby]
         default: small-ruby
+      reasoning_mode:
+        description: Reasoning mode
+        type: choice
+        options: [auto, no-think]
+        default: auto
   push:
     branches: [main]
     paths:
@@ -38,6 +43,7 @@ jobs:
       profile: ${{ steps.config.outputs.profile }}
       repetitions: ${{ steps.config.outputs.repetitions }}
       fixture: ${{ steps.config.outputs.fixture }}
+      reasoning_mode: ${{ steps.config.outputs.reasoning_mode }}
       matrix: ${{ steps.models.outputs.matrix }}
     steps:
       - uses: actions/checkout@v5
@@ -49,6 +55,7 @@ jobs:
           INPUT_PROFILE: ${{ inputs.profile }}
           INPUT_REPETITIONS: ${{ inputs.repetitions }}
           INPUT_FIXTURE: ${{ inputs.fixture }}
+          INPUT_REASONING: ${{ inputs.reasoning_mode }}
         run: |
           python3 - <<'PY'
           import json, os
@@ -56,37 +63,39 @@ jobs:
 
           if os.environ['EVENT_NAME'] == 'workflow_dispatch':
               request = {
-                  'profile': os.environ.get('INPUT_PROFILE') or 'core',
-                  'repetitions': os.environ.get('INPUT_REPETITIONS') or '10',
+                  'profile': os.environ.get('INPUT_PROFILE') or 'selection',
+                  'repetitions': os.environ.get('INPUT_REPETITIONS') or '3',
                   'fixture': os.environ.get('INPUT_FIXTURE') or 'small-ruby',
+                  'reasoning_mode': os.environ.get('INPUT_REASONING') or 'auto',
                   'enabled': True,
               }
           else:
               path = Path('.github/benchmark-request.json')
-              if not path.exists() or not path.read_text().strip():
-                  request = {'enabled': False}
-              else:
-                  request = json.loads(path.read_text())
-                  request.setdefault('enabled', True)
+              request = {'enabled': False} if not path.exists() or not path.read_text().strip() else json.loads(path.read_text())
+              request.setdefault('enabled', True)
 
           enabled = bool(request.get('enabled'))
-          profile = str(request.get('profile', 'core'))
+          profile = str(request.get('profile', 'selection'))
           repetitions = str(request.get('repetitions', '3'))
           fixture = str(request.get('fixture', 'small-ruby'))
+          reasoning_mode = str(request.get('reasoning_mode', 'auto'))
 
           if enabled:
-              if profile not in {'core', 'extended'}:
+              if profile not in {'core', 'selection'}:
                   raise SystemExit(f'unsupported profile: {profile}')
               if repetitions not in {'3', '5', '10'}:
                   raise SystemExit(f'unsupported repetitions: {repetitions}')
-              if fixture not in {'small-ruby'}:
+              if fixture != 'small-ruby':
                   raise SystemExit(f'unsupported fixture: {fixture}')
+              if reasoning_mode not in {'auto', 'no-think'}:
+                  raise SystemExit(f'unsupported reasoning mode: {reasoning_mode}')
 
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
               f.write(f"enabled={'true' if enabled else 'false'}\n")
               f.write(f'profile={profile}\n')
               f.write(f'repetitions={repetitions}\n')
               f.write(f'fixture={fixture}\n')
+              f.write(f'reasoning_mode={reasoning_mode}\n')
           PY
 
       - id: models
@@ -98,7 +107,8 @@ jobs:
           import json, os
           models = json.load(open('config/models.json'))['models']
           profile = os.environ['PROFILE']
-          selected = [m for m in models if profile == 'extended' or m['tier'] == 'core']
+          core = {'qwen3-0.6b', 'qwen3-1.7b', 'qwen3-4b'}
+          selected = models if profile == 'selection' else [m for m in models if m['key'] in core]
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
               f.write('matrix=' + json.dumps({'include': selected}, separators=(',', ':')) + '\n')
           PY
@@ -110,7 +120,7 @@ jobs:
     timeout-minutes: 45
     strategy:
       fail-fast: false
-      max-parallel: 9
+      max-parallel: 7
       matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
     steps:
       - name: Check private result sink
@@ -130,31 +140,53 @@ jobs:
           repository: faheemKamboh/agentic-development-benchmarks
           path: benchmark-fixtures
 
-      - name: Restore model cache
+      - name: Restore exact model cache
         uses: actions/cache@v4
         with:
-          path: .hf-cache
-          key: hf-${{ runner.os }}-${{ matrix.key }}-${{ matrix.quant }}-v1
+          path: .model-cache
+          key: model-${{ runner.os }}-${{ matrix.key }}-${{ matrix.quant }}-v2
+
+      - name: Download exact GGUF
+        env:
+          HF_REPO: ${{ matrix.hf_repo }}
+          HF_FILE: ${{ matrix.hf_file }}
+          MODEL_KEY: ${{ matrix.key }}
+        run: |
+          set -euo pipefail
+          mkdir -p .model-cache results
+          MODEL_PATH=".model-cache/${MODEL_KEY}.gguf"
+          if [ ! -s "$MODEL_PATH" ]; then
+            curl -fL --retry 3 --retry-delay 2 \
+              "https://huggingface.co/${HF_REPO}/resolve/main/${HF_FILE}?download=true" \
+              -o "${MODEL_PATH}.tmp"
+            mv "${MODEL_PATH}.tmp" "$MODEL_PATH"
+          fi
 
       - name: Start model server
         env:
-          HF_REPO: ${{ matrix.hf_repo }}
-          QUANT: ${{ matrix.quant }}
+          HF_FILE: ${{ matrix.hf_file }}
+          MODEL_KEY: ${{ matrix.key }}
         run: |
-          mkdir -p .hf-cache results
           docker pull ghcr.io/ggml-org/llama.cpp:server
+          date +%s%3N > results/model-start-ms
           docker run -d --name llm-server \
             --cpus=4 \
             -p 8080:8080 \
-            -v "$PWD/.hf-cache:/root/.cache/huggingface/hub" \
+            -v "$PWD/.model-cache:/models:ro" \
             ghcr.io/ggml-org/llama.cpp:server \
-            -hf "${HF_REPO}:${QUANT}" --no-mmproj \
+            -m "/models/${MODEL_KEY}.gguf" \
             --host 0.0.0.0 --port 8080 -t 4 -np 1 -c 4096
 
       - name: Wait for model
+        env:
+          MODEL_KEY: ${{ matrix.key }}
         run: |
           for i in $(seq 1 300); do
             if curl -fsS http://127.0.0.1:8080/health >/dev/null 2>&1; then
+              END_MS=$(date +%s%3N)
+              START_MS=$(cat results/model-start-ms)
+              SHA=$(sha256sum ".model-cache/${MODEL_KEY}.gguf" | cut -d' ' -f1)
+              printf '{"model_load_ms":%s,"model_sha256":"%s"}\n' "$((END_MS-START_MS))" "$SHA" > "results/${MODEL_KEY}-startup.json"
               exit 0
             fi
             if ! docker inspect -f '{{.State.Running}}' llm-server 2>/dev/null | grep -q true; then
@@ -188,14 +220,25 @@ jobs:
             --skill skills/small-fix/SKILL.md \
             --model-key "${{ matrix.key }}" \
             --repetitions "${{ needs.prepare.outputs.repetitions }}" \
+            --reasoning-mode "${{ needs.prepare.outputs.reasoning_mode }}" \
             --output "results/${{ matrix.key }}.json" \
             > "results/${{ matrix.key }}-runner.log" 2>&1
+
+      - name: Enrich metrics
+        if: always()
+        run: |
+          if [ -f results/sampler.pid ]; then kill "$(cat results/sampler.pid)" 2>/dev/null || true; fi
+          if [ -f "results/${{ matrix.key }}.json" ]; then
+            python3 runner/enrich.py \
+              --result "results/${{ matrix.key }}.json" \
+              --resources "results/${{ matrix.key }}-resources.tsv" \
+              --startup "results/${{ matrix.key }}-startup.json"
+          fi
 
       - name: Capture diagnostics
         if: always()
         run: |
           mkdir -p results
-          if [ -f results/sampler.pid ]; then kill "$(cat results/sampler.pid)" 2>/dev/null || true; fi
           docker logs llm-server > "results/${{ matrix.key }}-server.log" 2>&1 || true
           docker stop llm-server >/dev/null 2>&1 || true
 
@@ -207,11 +250,19 @@ jobs:
           MODEL_KEY: ${{ matrix.key }}
           RUN_ID: ${{ github.run_id }}
         run: |
+          set -euo pipefail
+          if [ -f "results/${MODEL_KEY}.json" ]; then
+            encoded=$(base64 -w0 "results/${MODEL_KEY}.json")
+            gh api --method PUT \
+              "repos/${CONTROL_REPO}/contents/benchmark-results/${RUN_ID}/results/${MODEL_KEY}.json" \
+              -f message="Store benchmark result ${RUN_ID} ${MODEL_KEY}" \
+              -f content="$encoded" >/dev/null
+          fi
           tar -czf "/tmp/${MODEL_KEY}.tgz" results
           content=$(base64 -w0 "/tmp/${MODEL_KEY}.tgz")
           gh api --method PUT \
             "repos/${CONTROL_REPO}/contents/benchmark-results/${RUN_ID}/raw/${MODEL_KEY}.tgz" \
-            -f message="Store benchmark run ${RUN_ID} result" \
+            -f message="Store benchmark diagnostics ${RUN_ID} ${MODEL_KEY}" \
             -f content="$content" >/dev/null
 
   aggregate:
@@ -229,31 +280,34 @@ jobs:
 
       - uses: actions/checkout@v5
 
-      - name: Download private raw results
+      - name: Download private result JSON
         env:
           GH_TOKEN: ${{ secrets.CONTROL_REPO_TOKEN }}
           CONTROL_REPO: ${{ secrets.CONTROL_REPO }}
           PROFILE: ${{ needs.prepare.outputs.profile }}
           RUN_ID: ${{ github.run_id }}
         run: |
-          mkdir -p downloaded results
+          set -euo pipefail
+          mkdir -p results report
           python3 - <<'PY' > /tmp/model-keys
           import json, os
           models = json.load(open('config/models.json'))['models']
-          profile = os.environ['PROFILE']
+          core = {'qwen3-0.6b', 'qwen3-1.7b', 'qwen3-4b'}
           for m in models:
-              if profile == 'extended' or m['tier'] == 'core':
+              if os.environ['PROFILE'] == 'selection' or m['key'] in core:
                   print(m['key'])
           PY
           while read -r key; do
-            if gh api -H 'Accept: application/vnd.github.raw+json' \
-              "repos/${CONTROL_REPO}/contents/benchmark-results/${RUN_ID}/raw/${key}.tgz" \
-              > "downloaded/${key}.tgz" 2>/dev/null; then
-              mkdir -p "downloaded/${key}"
-              tar -xzf "downloaded/${key}.tgz" -C "downloaded/${key}"
-              find "downloaded/${key}" -type f -name "${key}.json" -exec cp {} results/ \;
+            meta="/tmp/${key}.json"
+            if gh api "repos/${CONTROL_REPO}/contents/benchmark-results/${RUN_ID}/results/${key}.json" > "$meta" 2>/dev/null; then
+              python3 - "$meta" "results/${key}.json" <<'PY'
+          import base64, json, sys
+          meta = json.load(open(sys.argv[1]))
+          open(sys.argv[2], 'wb').write(base64.b64decode(meta['content']))
+          PY
             fi
           done < /tmp/model-keys
+          test "$(find results -name '*.json' | wc -l)" -gt 0
 
       - name: Build private summary
         run: python3 runner/aggregate.py > /dev/null
@@ -269,6 +323,6 @@ jobs:
             content=$(base64 -w0 "$file")
             gh api --method PUT \
               "repos/${CONTROL_REPO}/contents/benchmark-results/${RUN_ID}/${name}" \
-              -f message="Store benchmark run ${RUN_ID} aggregate" \
+              -f message="Store benchmark aggregate ${RUN_ID}" \
               -f content="$content" >/dev/null
           done
