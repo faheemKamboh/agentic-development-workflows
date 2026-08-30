@@ -4,7 +4,18 @@
     {"key":"qwen2.5-coder-1.5b","family":"qwen2.5-coder","hf_repo":"Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF","hf_file":"qwen2.5-coder-1.5b-instruct-q4_k_m.gguf","quant":"Q4_K_M","tier":"selection"},
     {"key":"qwen2.5-coder-3b","family":"qwen2.5-coder","hf_repo":"Qwen/Qwen2.5-Coder-3B-Instruct-GGUF","hf_file":"qwen2.5-coder-3b-instruct-q4_k_m.gguf","quant":"Q4_K_M","tier":"selection"},
     {"key":"qwen2.5-coder-7b","family":"qwen2.5-coder","hf_repo":"bartowski/Qwen2.5-Coder-7B-Instruct-GGUF","hf_file":"Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"},
-    {"key":"granite-code-3b","family":"granite-code","hf_repo":"tensorblock/granite-3b-code-instruct-128k-GGUF","hf_file":"granite-3b-code-instruct-128k-Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"},
-    {"key":"starcoder2-3b-instruct","family":"starcoder2","hf_repo":"QuantFactory/starcoder2-3b-instruct-GGUF","hf_file":"starcoder2-3b-instruct.Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"}
+    {"key":"deepseek-coder-1.3b","family":"deepseek-coder","hf_repo":"TheBloke/deepseek-coder-1.3b-instruct-GGUF","hf_file":"deepseek-coder-1.3b-instruct.Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"},
+    {"key":"deepseek-coder-6.7b","family":"deepseek-coder","hf_repo":"TheBloke/deepseek-coder-6.7B-instruct-GGUF","hf_file":"deepseek-coder-6.7b-instruct.Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"},
+    {"key":"yi-coder-1.5b","family":"yi-coder","hf_repo":"bartowski/Yi-Coder-1.5B-Chat-GGUF","hf_file":"Yi-Coder-1.5B-Chat-Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"},
+    {"key":"yi-coder-9b","family":"yi-coder","hf_repo":"bartowski/Yi-Coder-9B-Chat-GGUF","hf_file":"Yi-Coder-9B-Chat-Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"},
+    {"key":"granite-code-3b","family":"granite-code","hf_repo":"mradermacher/granite-3b-code-instruct-128k-GGUF","hf_file":"granite-3b-code-instruct-128k.Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"},
+    {"key":"stable-code-3b","family":"stable-code","hf_repo":"bartowski/stable-code-instruct-3b-GGUF","hf_file":"stable-code-instruct-3b-Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"},
+    {"key":"starcoder2-3b-instruct","family":"starcoder2","hf_repo":"QuantFactory/starcoder2-3b-instruct-GGUF","hf_file":"starcoder2-3b-instruct.Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"},
+    {"key":"codegemma-7b-it","family":"codegemma","hf_repo":"bartowski/codegemma-7b-it-GGUF","hf_file":"codegemma-7b-it-Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"},
+    {"key":"codellama-7b-instruct","family":"codellama","hf_repo":"TheBloke/CodeLlama-7B-Instruct-GGUF","hf_file":"codellama-7b-instruct.Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"},
+    {"key":"phi3.5-mini","family":"phi3.5","hf_repo":"bartowski/Phi-3.5-mini-instruct-GGUF","hf_file":"Phi-3.5-mini-instruct-Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"},
+    {"key":"llama3.2-3b","family":"llama3.2","hf_repo":"bartowski/Llama-3.2-3B-Instruct-GGUF","hf_file":"Llama-3.2-3B-Instruct-Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"},
+    {"key":"mistral-7b-v0.3","family":"mistral","hf_repo":"bartowski/Mistral-7B-Instruct-v0.3-GGUF","hf_file":"Mistral-7B-Instruct-v0.3-Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"},
+    {"key":"gemma2-2b-it","family":"gemma2","hf_repo":"bartowski/gemma-2-2b-it-GGUF","hf_file":"gemma-2-2b-it-Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"}
   ]
 }
