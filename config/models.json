@@ -1,11 +1,10 @@
 {
   "models": [
-    {"key":"qwen3-0.6b","family":"qwen3","hf_repo":"smarttasks/Qwen3-0.6B-GGUF","hf_file":"Qwen3-0.6B-Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"},
-    {"key":"qwen3-1.7b","family":"qwen3","hf_repo":"ggml-org/Qwen3-1.7B-GGUF","hf_file":"Qwen3-1.7B-Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"},
-    {"key":"qwen3-4b","family":"qwen3","hf_repo":"Qwen/Qwen3-4B-GGUF","hf_file":"Qwen3-4B-Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"},
-    {"key":"qwen3.5-0.8b","family":"qwen3.5","hf_repo":"bartowski/Qwen_Qwen3.5-0.8B-GGUF","hf_file":"Qwen_Qwen3.5-0.8B-Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"},
-    {"key":"qwen3.5-2b","family":"qwen3.5","hf_repo":"bartowski/Qwen_Qwen3.5-2B-GGUF","hf_file":"Qwen_Qwen3.5-2B-Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"},
-    {"key":"qwen3.5-4b","family":"qwen3.5","hf_repo":"bartowski/Qwen_Qwen3.5-4B-GGUF","hf_file":"Qwen_Qwen3.5-4B-Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"},
-    {"key":"phi4-mini-3.8b","family":"phi4","hf_repo":"inferenceport-ai/Phi-4-mini-instruct-Q4_K_M-GGUF","hf_file":"phi-4-mini-instruct-q4_k_m.gguf","quant":"Q4_K_M","tier":"selection"}
+    {"key":"qwen2.5-coder-0.5b","family":"qwen2.5-coder","hf_repo":"Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF","hf_file":"qwen2.5-coder-0.5b-instruct-q4_k_m.gguf","quant":"Q4_K_M","tier":"selection"},
+    {"key":"qwen2.5-coder-1.5b","family":"qwen2.5-coder","hf_repo":"Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF","hf_file":"qwen2.5-coder-1.5b-instruct-q4_k_m.gguf","quant":"Q4_K_M","tier":"selection"},
+    {"key":"qwen2.5-coder-3b","family":"qwen2.5-coder","hf_repo":"Qwen/Qwen2.5-Coder-3B-Instruct-GGUF","hf_file":"qwen2.5-coder-3b-instruct-q4_k_m.gguf","quant":"Q4_K_M","tier":"selection"},
+    {"key":"qwen2.5-coder-7b","family":"qwen2.5-coder","hf_repo":"bartowski/Qwen2.5-Coder-7B-Instruct-GGUF","hf_file":"Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"},
+    {"key":"granite-code-3b","family":"granite-code","hf_repo":"tensorblock/granite-3b-code-instruct-128k-GGUF","hf_file":"granite-3b-code-instruct-128k-Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"},
+    {"key":"starcoder2-3b-instruct","family":"starcoder2","hf_repo":"QuantFactory/starcoder2-3b-instruct-GGUF","hf_file":"starcoder2-3b-instruct.Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"}
   ]
 }
