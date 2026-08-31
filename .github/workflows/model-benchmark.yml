@@ -6,8 +6,8 @@ on:
       profile:
         description: Model set
         type: choice
-        options: [core, selection, finalists]
-        default: finalists
+        options: [core, selection, finalists, threshold]
+        default: threshold
       repetitions:
         description: Repetitions per model
         type: choice
@@ -65,7 +65,7 @@ jobs:
 
           if os.environ['EVENT_NAME'] == 'workflow_dispatch':
               request = {
-                  'profile': os.environ.get('INPUT_PROFILE') or 'finalists',
+                  'profile': os.environ.get('INPUT_PROFILE') or 'threshold',
                   'repetitions': os.environ.get('INPUT_REPETITIONS') or '3',
                   'fixture': os.environ.get('INPUT_FIXTURE') or 'medium-ruby',
                   'reasoning_mode': os.environ.get('INPUT_REASONING') or 'auto',
@@ -77,13 +77,13 @@ jobs:
               request.setdefault('enabled', True)
 
           enabled = bool(request.get('enabled'))
-          profile = str(request.get('profile', 'finalists'))
+          profile = str(request.get('profile', 'threshold'))
           repetitions = str(request.get('repetitions', '3'))
           fixture = str(request.get('fixture', 'medium-ruby'))
           reasoning_mode = str(request.get('reasoning_mode', 'auto'))
 
           if enabled:
-              if profile not in {'core', 'selection', 'finalists'}:
+              if profile not in {'core', 'selection', 'finalists', 'threshold'}:
                   raise SystemExit(f'unsupported profile: {profile}')
               if repetitions not in {'3', '5', '10'}:
                   raise SystemExit(f'unsupported repetitions: {repetitions}')
@@ -115,10 +115,13 @@ jobs:
           profile = os.environ['PROFILE']
           core = {'qwen2.5-coder-0.5b', 'qwen2.5-coder-1.5b', 'qwen2.5-coder-3b', 'qwen2.5-coder-7b'}
           finalists = {'llama3.2-3b', 'qwen2.5-coder-7b'}
+          threshold = {'opencoder-8b-instruct', 'glm4-9b-chat', 'granite-code-8b'}
           if profile == 'selection':
               selected = models
           elif profile == 'finalists':
               selected = [m for m in models if m['key'] in finalists]
+          elif profile == 'threshold':
+              selected = [m for m in models if m['key'] in threshold]
           else:
               selected = [m for m in models if m['key'] in core]
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
@@ -308,8 +311,9 @@ jobs:
           profile = os.environ['PROFILE']
           core = {'qwen2.5-coder-0.5b', 'qwen2.5-coder-1.5b', 'qwen2.5-coder-3b', 'qwen2.5-coder-7b'}
           finalists = {'llama3.2-3b', 'qwen2.5-coder-7b'}
+          threshold = {'opencoder-8b-instruct', 'glm4-9b-chat', 'granite-code-8b'}
           for m in models:
-              if profile == 'selection' or (profile == 'finalists' and m['key'] in finalists) or (profile == 'core' and m['key'] in core):
+              if profile == 'selection' or (profile == 'finalists' and m['key'] in finalists) or (profile == 'threshold' and m['key'] in threshold) or (profile == 'core' and m['key'] in core):
                   print(m['key'])
           PY
           while read -r key; do
