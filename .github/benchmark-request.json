@@ -1,8 +1,8 @@
 {
   "enabled": true,
-  "profile": "finalists",
+  "profile": "threshold",
   "repetitions": "3",
   "fixture": "medium-ruby",
   "reasoning_mode": "auto",
-  "request_id": "finalists-medium-ruby-001"
+  "request_id": "threshold-medium-ruby-001"
 }
