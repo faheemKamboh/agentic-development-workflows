@@ -16,6 +16,9 @@
     {"key":"phi3.5-mini","family":"phi3.5","hf_repo":"bartowski/Phi-3.5-mini-instruct-GGUF","hf_file":"Phi-3.5-mini-instruct-Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"},
     {"key":"llama3.2-3b","family":"llama3.2","hf_repo":"bartowski/Llama-3.2-3B-Instruct-GGUF","hf_file":"Llama-3.2-3B-Instruct-Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"},
     {"key":"mistral-7b-v0.3","family":"mistral","hf_repo":"bartowski/Mistral-7B-Instruct-v0.3-GGUF","hf_file":"Mistral-7B-Instruct-v0.3-Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"},
-    {"key":"gemma2-2b-it","family":"gemma2","hf_repo":"bartowski/gemma-2-2b-it-GGUF","hf_file":"gemma-2-2b-it-Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"}
+    {"key":"gemma2-2b-it","family":"gemma2","hf_repo":"bartowski/gemma-2-2b-it-GGUF","hf_file":"gemma-2-2b-it-Q4_K_M.gguf","quant":"Q4_K_M","tier":"selection"},
+    {"key":"opencoder-8b-instruct","family":"opencoder","hf_repo":"bartowski/OpenCoder-8B-Instruct-GGUF","hf_file":"OpenCoder-8B-Instruct-Q4_K_M.gguf","quant":"Q4_K_M","tier":"threshold"},
+    {"key":"glm4-9b-chat","family":"glm4","hf_repo":"bartowski/glm-4-9b-chat-GGUF","hf_file":"glm-4-9b-chat-Q4_K_M.gguf","quant":"Q4_K_M","tier":"threshold"},
+    {"key":"granite-code-8b","family":"granite-code","hf_repo":"tensorblock/granite-8b-code-instruct-4k-GGUF","hf_file":"granite-8b-code-instruct-4k-Q4_K_M.gguf","quant":"Q4_K_M","tier":"threshold"}
   ]
 }
